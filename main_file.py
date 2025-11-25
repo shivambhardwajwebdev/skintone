@@ -1,31 +1,43 @@
-# I've left some code in comments so that it can be easier if one wants to test and see output at various points. To make things simpler just remove the commented code !
-
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import cv2
+import numpy as np
 import face_detect
 import kMeansImgPy
-import cv2
 import allotSkinTone
 
+app = Flask(__name__)
+CORS(app)
 
-while True:
-    img_link = input("Image file name : ")
-    image = cv2.imread(img_link)
+@app.route('/analyze-skin-tone', methods=['POST'])
+def analyze_skin_tone():
+    try:
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image provided'}), 400
 
-    # Detect face and extract
-    face_extracted = face_detect.detect_face(image)
-    # Pass extracted face to kMeans and get Max color list 
-    colorsList = kMeansImgPy.kMeansImage(face_extracted)
+        file = request.files['image']
+        npimg = np.fromfile(file, np.uint8)
+        image = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
 
-    print("Main File : ")
-    print("Red Component : "+str(colorsList[0]))
-    print("Green Component : "+str(colorsList[1]))
-    print("Blue Component : "+str(colorsList[2]))
+        # 1. Detect Face
+        try:
+            face_extracted = face_detect.detect_face(image)
+        except Exception:
+            return jsonify({'error': 'No face detected. Try a clearer photo.'}), 400
 
-    # Allot the actual skinTone to a certain shade
-    allotedSkinToneVal = allotSkinTone.allotSkin(colorsList)
-    print("alloted skin tone : ")
-    print(allotedSkinToneVal)
+        # 2. Get Dominant Color
+        colorsList = kMeansImgPy.kMeansImage(face_extracted)
 
-    # Algorithm stop code.
-    stopQ = input("Stop ? ( y || n ) ")
-    if stopQ == 'y':
-        break
+        # 3. Get Text Label
+        result_label = allotSkinTone.allotSkin(colorsList)
+
+        return jsonify({
+            'status': 'success',
+            'skin_tone': result_label,
+            'rgb': colorsList
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Gunicorn will look for 'app', so we don't need app.run() here for production
