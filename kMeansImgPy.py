@@ -1,7 +1,6 @@
 # I've left some code in comments so that it can be easier if one wants to test and see output at various points. To make things simpler just remove the commented code !
 
 from sklearn.cluster import KMeans
-import matplotlib.pyplot as plt
 import utils
 import cv2
 import numpy as np
